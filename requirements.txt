@@ -1,0 +1,13 @@
+python-dotenv==1.0.1
+pandas==2.2.2
+numpy==1.26.4
+binance-connector==3.6.0
+websocket-client==1.8.0
+requests==2.32.3
+pytz==2024.1
+stable-baselines3==2.3.2
+torch>=2.2.0
+fastapi==0.111.0
+uvicorn==0.30.1
+FinRL==0.3.6
+pydantic==2.7.2
