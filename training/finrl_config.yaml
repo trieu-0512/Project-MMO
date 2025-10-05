@@ -1,0 +1,15 @@
+spot:
+  algo: ppo
+  interval: 1h
+  start: 2022-01-01
+  end: 2025-09-30
+  timesteps: 1500000
+  symbols: [BTCUSDT, ETHUSDT]
+
+futures:
+  algo: sac
+  interval: 1h
+  start: 2022-01-01
+  end: 2025-09-30
+  timesteps: 1500000
+  symbols: [BTCUSDT, ETHUSDT]
