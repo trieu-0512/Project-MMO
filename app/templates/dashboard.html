@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FinRL Bot Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              background: '#081324',
+              surface: '#0F1C34',
+              accent: '#2BD4BD',
+              warning: '#FFB020',
+              danger: '#F05252',
+              success: '#22C55E',
+            },
+            boxShadow: {
+              soft: '0 20px 45px rgba(0,0,0,0.35)',
+            },
+            fontFamily: {
+              inter: ['Inter', 'sans-serif'],
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-oPmUPdCecO8+1n+nzdl8CjW8pYl4PhCoOAdIZ6hCJ4Xff3yvGN9VOGBev5nYeD1v" crossorigin="anonymous"></script>
+    <style>
+      html,
+      body {
+        height: 100%;
+        overflow: hidden;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        background: radial-gradient(circle at top left, rgba(43, 212, 189, 0.08), transparent 40%),
+          radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.08), transparent 45%),
+          #050B19;
+      }
+      .glass {
+        background: rgba(13, 25, 48, 0.85);
+        backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.04);
+      }
+      .tab-button.active {
+        background: rgba(43, 212, 189, 0.12);
+        color: #2BD4BD;
+      }
+      .sub-tab-button.active {
+        background: rgba(59, 130, 246, 0.15);
+        color: #93C5FD;
+      }
+      .indicator-dot {
+        box-shadow: 0 0 16px rgba(34, 197, 94, 0.75);
+      }
+      .content-panel {
+        height: calc(100vh - 140px);
+      }
+      .panel-scroll {
+        scrollbar-width: thin;
+      }
+      .panel-scroll::-webkit-scrollbar {
+        width: 6px;
+      }
+      .panel-scroll::-webkit-scrollbar-track {
+        background: rgba(15, 28, 52, 0.4);
+      }
+      .panel-scroll::-webkit-scrollbar-thumb {
+        background: rgba(43, 212, 189, 0.5);
+        border-radius: 9999px;
+      }
+    </style>
+  </head>
+  <body class="text-slate-100 h-full">
+    <div class="h-full flex flex-col px-10 py-8">
+      <header class="flex items-center justify-between mb-8">
+        <div class="flex items-center space-x-4">
+          <div class="w-12 h-12 rounded-2xl glass flex items-center justify-center shadow-soft">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M12 3L20 7V17L12 21L4 17V7L12 3Z" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M12 3V21" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M4 7L12 11L20 7" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M4 17L12 13L20 17" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="text-3xl font-semibold tracking-tight">FinRL Bot Dashboard</h1>
+            <p class="text-sm text-slate-400">Giám sát giao dịch Spot &amp; Futures theo thời gian thực</p>
+          </div>
+        </div>
+        <div class="flex items-center space-x-6">
+          <button id="themeToggle" class="glass px-4 py-2 rounded-xl text-sm font-medium transition hover:-translate-y-0.5">
+            Chế độ tối
+          </button>
+          <div class="flex items-center space-x-2">
+            <span class="relative flex h-3 w-3">
+              <span class="absolute inline-flex h-full w-full rounded-full bg-success indicator-dot animate-ping opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-3 w-3 bg-success indicator-dot"></span>
+            </span>
+            <span class="text-sm font-medium text-success">Running</span>
+          </div>
+        </div>
+      </header>
+
+      <nav class="flex space-x-2 mb-6">
+        <button class="tab-button active glass px-6 py-3 rounded-2xl text-sm font-semibold transition" data-target="dashboard">
+          Dashboard
+        </button>
+        <button class="tab-button glass px-6 py-3 rounded-2xl text-sm font-semibold transition" data-target="trading">
+          Trading
+        </button>
+        <button class="tab-button glass px-6 py-3 rounded-2xl text-sm font-semibold transition" data-target="system">
+          System
+        </button>
+      </nav>
+
+      <main class="content-panel flex-1 glass rounded-3xl shadow-soft p-8 overflow-hidden">
+        <section id="dashboard" class="panel-scroll h-full overflow-y-auto pr-2 space-y-8">
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div class="rounded-3xl glass p-6 shadow-soft">
+              <div class="text-sm text-slate-400">Total NAV</div>
+              <div class="flex items-baseline space-x-2 mt-3">
+                <div id="navTotal" class="text-3xl font-semibold">$0.00</div>
+                <div id="navChange" class="text-sm text-success">+0.00%</div>
+              </div>
+              <div class="text-xs text-slate-500 mt-2">Spot: <span id="navSpot">$0.00</span> · Futures: <span id="navFutures">$0.00</span></div>
+            </div>
+            <div class="rounded-3xl glass p-6 shadow-soft">
+              <div class="text-sm text-slate-400">Session PnL</div>
+              <div class="flex items-baseline space-x-2 mt-3">
+                <div id="sessionPnl" class="text-3xl font-semibold">$0.00</div>
+                <div id="sessionPnlPct" class="text-sm text-success">+0.00%</div>
+              </div>
+              <div class="text-xs text-slate-500 mt-2">Cập nhật: <span id="statusTimestamp">--:--</span></div>
+            </div>
+            <div class="rounded-3xl glass p-6 shadow-soft">
+              <div class="text-sm text-slate-400">Open Positions</div>
+              <div class="flex items-baseline space-x-2 mt-3">
+                <div id="openPositions" class="text-3xl font-semibold">0</div>
+                <div class="text-sm text-slate-400">positions</div>
+              </div>
+              <div class="text-xs text-slate-500 mt-2">NAV allocated Spot/Fut tương ứng chiến dịch</div>
+            </div>
+            <div class="rounded-3xl glass p-6 shadow-soft">
+              <div class="text-sm text-slate-400">Critical Alerts</div>
+              <div class="flex items-baseline space-x-2 mt-3">
+                <div id="criticalAlerts" class="text-3xl font-semibold text-danger">0</div>
+                <div class="text-sm text-slate-400">cảnh báo</div>
+              </div>
+              <div class="text-xs text-slate-500 mt-2">Theo dõi funding, daily stop, API errors</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            <div class="xl:col-span-2 rounded-3xl glass p-6 shadow-soft">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h2 class="text-lg font-semibold">NAV Performance</h2>
+                  <p class="text-xs text-slate-500">Equity curve &amp; drawdown</p>
+                </div>
+                <div class="flex items-center space-x-2 text-xs text-slate-400">
+                  <span class="inline-flex items-center space-x-1"><span class="w-2 h-2 rounded-full bg-accent"></span><span>Equity</span></span>
+                  <span class="inline-flex items-center space-x-1"><span class="w-2 h-2 rounded-full bg-sky-400"></span><span>Drawdown</span></span>
+                </div>
+              </div>
+              <canvas id="equityChart" class="w-full h-64"></canvas>
+            </div>
+            <div class="rounded-3xl glass p-6 shadow-soft">
+              <h2 class="text-lg font-semibold mb-4">System Status</h2>
+              <dl class="space-y-3 text-sm">
+                <div class="flex items-center justify-between">
+                  <dt>Daemon Heartbeat</dt>
+                  <dd id="heartbeat" class="text-success">--</dd>
+                </div>
+                <div class="flex items-center justify-between">
+                  <dt>Scheduler</dt>
+                  <dd id="schedulerStatus" class="text-success">Healthy</dd>
+                </div>
+                <div class="flex items-center justify-between">
+                  <dt>Redis</dt>
+                  <dd id="redisStatus" class="text-success">Connected</dd>
+                </div>
+                <div class="flex items-center justify-between">
+                  <dt>DB Latency</dt>
+                  <dd id="dbLatency" class="text-slate-300">-- ms</dd>
+                </div>
+                <div class="flex items-center justify-between">
+                  <dt>Uptime</dt>
+                  <dd id="uptime" class="text-slate-300">99.5%</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+
+          <div class="rounded-3xl glass p-6 shadow-soft">
+            <h2 class="text-lg font-semibold mb-6">Key Performance Indicators (KPIs)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
+              <div class="rounded-2xl glass p-4">
+                <div class="text-xs text-slate-400">Sharpe Ratio</div>
+                <div id="kpiSharpe" class="text-2xl font-semibold mt-2">0.00</div>
+              </div>
+              <div class="rounded-2xl glass p-4">
+                <div class="text-xs text-slate-400">Sortino Ratio</div>
+                <div id="kpiSortino" class="text-2xl font-semibold mt-2">0.00</div>
+              </div>
+              <div class="rounded-2xl glass p-4">
+                <div class="text-xs text-slate-400">Max Drawdown</div>
+                <div id="kpiMaxDD" class="text-2xl font-semibold mt-2">0.00%</div>
+              </div>
+              <div class="rounded-2xl glass p-4">
+                <div class="text-xs text-slate-400">Profit Factor</div>
+                <div id="kpiProfitFactor" class="text-2xl font-semibold mt-2">0.00</div>
+              </div>
+              <div class="rounded-2xl glass p-4">
+                <div class="text-xs text-slate-400">Hit Rate</div>
+                <div id="kpiHitRate" class="text-2xl font-semibold mt-2">0.00%</div>
+              </div>
+              <div class="rounded-2xl glass p-4">
+                <div class="text-xs text-slate-400">Uptime</div>
+                <div id="kpiUptime" class="text-2xl font-semibold mt-2">99.5%</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="trading" class="panel-scroll h-full overflow-y-auto pr-2 space-y-8 hidden">
+          <div class="rounded-3xl glass p-6 shadow-soft">
+            <div class="flex items-center justify-between mb-6">
+              <div>
+                <h2 class="text-lg font-semibold">Trade Activity</h2>
+                <p class="text-xs text-slate-500">Giám sát vị thế mở &amp; lịch sử lệnh</p>
+              </div>
+              <div class="flex items-center space-x-2 bg-slate-900/60 rounded-full p-1">
+                <button class="sub-tab-button active px-4 py-2 rounded-full text-xs font-semibold" data-subtarget="openPositionsTable">
+                  Open Positions
+                </button>
+                <button class="sub-tab-button px-4 py-2 rounded-full text-xs font-semibold" data-subtarget="recentOrdersTable">
+                  Recent Orders
+                </button>
+              </div>
+            </div>
+            <div id="openPositionsTable" class="overflow-hidden">
+              <table class="min-w-full text-sm">
+                <thead class="text-slate-400">
+                  <tr class="text-left">
+                    <th class="py-2 font-medium">Symbol</th>
+                    <th class="py-2 font-medium">Campaign</th>
+                    <th class="py-2 font-medium">Side</th>
+                    <th class="py-2 font-medium">Qty</th>
+                    <th class="py-2 font-medium">Avg Price</th>
+                    <th class="py-2 font-medium">SL / TP</th>
+                    <th class="py-2 font-medium">PnL</th>
+                    <th class="py-2 font-medium">Updated</th>
+                  </tr>
+                </thead>
+                <tbody id="positionsBody" class="divide-y divide-slate-800"></tbody>
+              </table>
+            </div>
+            <div id="recentOrdersTable" class="overflow-hidden hidden">
+              <table class="min-w-full text-sm">
+                <thead class="text-slate-400">
+                  <tr class="text-left">
+                    <th class="py-2 font-medium">Time</th>
+                    <th class="py-2 font-medium">Symbol</th>
+                    <th class="py-2 font-medium">Side</th>
+                    <th class="py-2 font-medium">Type</th>
+                    <th class="py-2 font-medium">Qty</th>
+                    <th class="py-2 font-medium">Price</th>
+                    <th class="py-2 font-medium">Fee</th>
+                    <th class="py-2 font-medium">Slippage</th>
+                  </tr>
+                </thead>
+                <tbody id="ordersBody" class="divide-y divide-slate-800"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div class="rounded-3xl glass p-6 shadow-soft">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h2 class="text-lg font-semibold">Screener Top-N</h2>
+                  <p class="text-xs text-slate-500">Sharpe, Sortino, ATR%, Risk/Reward</p>
+                </div>
+                <button
+                  id="runScreener"
+                  class="px-4 py-2 rounded-xl glass text-xs font-semibold transition hover:-translate-y-0.5"
+                  hx-post="/api/v1/screener/run"
+                  hx-trigger="click"
+                  hx-vals='{}'
+                  hx-swap="none"
+                >
+                  Refresh
+                </button>
+              </div>
+              <table class="min-w-full text-sm">
+                <thead class="text-slate-400">
+                  <tr class="text-left">
+                    <th class="py-2 font-medium">Symbol</th>
+                    <th class="py-2 font-medium">Campaign</th>
+                    <th class="py-2 font-medium">Score</th>
+                    <th class="py-2 font-medium">ATR%</th>
+                    <th class="py-2 font-medium">Exp. Return</th>
+                    <th class="py-2 font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="screenerBody" class="divide-y divide-slate-800"></tbody>
+              </table>
+            </div>
+            <div class="rounded-3xl glass p-6 shadow-soft">
+              <div class="flex items-center justify-between mb-4">
+                <div>
+                  <h2 class="text-lg font-semibold">Recent RL Signals</h2>
+                  <p class="text-xs text-slate-500">Confidence &amp; chiến dịch</p>
+                </div>
+                <span class="text-xs text-slate-400" id="signalsUpdated">--</span>
+              </div>
+              <ul id="signalsList" class="space-y-3 text-sm"></ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="system" class="panel-scroll h-full overflow-y-auto pr-2 space-y-8 hidden">
+          <div class="rounded-3xl glass p-6 shadow-soft">
+            <h2 class="text-lg font-semibold mb-6">Control Panel</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-6">
+              <button data-action="resume" class="rounded-2xl bg-success/20 border border-success/40 text-success font-semibold py-3 transition hover:-translate-y-0.5">Resume All</button>
+              <button data-action="pause" class="rounded-2xl bg-warning/20 border border-warning/40 text-warning font-semibold py-3 transition hover:-translate-y-0.5">Pause All</button>
+              <button data-action="kill" class="rounded-2xl bg-danger/20 border border-danger/40 text-danger font-semibold py-3 transition hover:-translate-y-0.5">Kill Switch</button>
+              <button data-action="hedge" class="rounded-2xl glass py-3 font-semibold transition hover:-translate-y-0.5">Toggle Hedge</button>
+            </div>
+            <form id="manualOrderForm" class="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div class="md:col-span-2">
+                <label class="text-xs text-slate-400">Symbol</label>
+                <input type="text" name="symbol" placeholder="BTCUSDT" class="mt-1 glass w-full rounded-xl border-none focus:ring-2 focus:ring-accent/60 text-slate-100" />
+              </div>
+              <div>
+                <label class="text-xs text-slate-400">Side</label>
+                <select name="side" class="mt-1 glass w-full rounded-xl border-none focus:ring-2 focus:ring-accent/60 text-slate-100 bg-transparent">
+                  <option value="BUY">BUY</option>
+                  <option value="SELL">SELL</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-slate-400">Type</label>
+                <select name="type" class="mt-1 glass w-full rounded-xl border-none focus:ring-2 focus:ring-accent/60 text-slate-100 bg-transparent">
+                  <option value="MARKET">MARKET</option>
+                  <option value="LIMIT">LIMIT</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-slate-400">Quantity</label>
+                <input type="number" name="qty" step="0.0001" class="mt-1 glass w-full rounded-xl border-none focus:ring-2 focus:ring-accent/60 text-slate-100" />
+              </div>
+              <div class="md:col-span-5 flex justify-end">
+                <button type="submit" class="px-6 py-3 rounded-2xl bg-accent/80 text-slate-900 font-semibold hover:bg-accent transition">Place Order</button>
+              </div>
+            </form>
+          </div>
+
+          <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div class="rounded-3xl glass p-6 shadow-soft">
+              <h2 class="text-lg font-semibold mb-4">Risk Settings</h2>
+              <dl class="space-y-3 text-sm" id="riskSettings">
+                <div class="flex items-center justify-between">
+                  <dt>Max Position % NAV</dt>
+                  <dd id="riskPosition" class="text-slate-300">--</dd>
+                </div>
+                <div class="flex items-center justify-between">
+                  <dt>Daily Stop Spot</dt>
+                  <dd id="riskDailySpot" class="text-slate-300">--</dd>
+                </div>
+                <div class="flex items-center justify-between">
+                  <dt>Daily Stop Futures</dt>
+                  <dd id="riskDailyFut" class="text-slate-300">--</dd>
+                </div>
+                <div class="flex items-center justify-between">
+                  <dt>ATR SL Multiplier</dt>
+                  <dd id="riskAtrSl" class="text-slate-300">--</dd>
+                </div>
+                <div class="flex items-center justify-between">
+                  <dt>ATR TP Multiplier</dt>
+                  <dd id="riskAtrTp" class="text-slate-300">--</dd>
+                </div>
+                <div class="flex items-center justify-between">
+                  <dt>Fee Guards</dt>
+                  <dd id="riskFee" class="text-slate-300">--</dd>
+                </div>
+              </dl>
+            </div>
+            <div class="rounded-3xl glass p-6 shadow-soft">
+              <h2 class="text-lg font-semibold mb-4">System Alerts</h2>
+              <ul id="systemAlerts" class="space-y-3 text-sm"></ul>
+            </div>
+          </div>
+
+          <div class="rounded-3xl glass p-6 shadow-soft">
+            <h2 class="text-lg font-semibold mb-4">Retrain Status</h2>
+            <div id="retrainStatus" class="text-sm text-slate-400">Chưa có yêu cầu retrain gần đây.</div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script>
+      const fmtCurrency = (value) => {
+        const number = Number(value || 0);
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(number);
+      };
+
+      const fmtPercent = (value, digits = 2) => {
+        const number = Number(value || 0);
+        return `${number >= 0 ? '+' : ''}${number.toFixed(digits)}%`;
+      };
+
+      const fmtNumber = (value, digits = 2) => {
+        const number = Number(value || 0);
+        return number.toFixed(digits);
+      };
+
+      const fmtTime = (value) => {
+        if (!value) return '--';
+        const dt = new Date(value);
+        return dt.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      };
+
+      let equityChart;
+
+      const ensureChart = (points = []) => {
+        const ctx = document.getElementById('equityChart');
+        if (!ctx) return;
+        const labels = points.length ? points.map((p) => new Date(p.timestamp || p.time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })) : Array.from({ length: 12 }, (_, i) => `T${i + 1}`);
+        const equity = points.length ? points.map((p) => Number(p.value || p.nav || 0)) : [100, 102, 101, 105, 108, 110, 112, 115, 118, 120, 123, 125];
+        const drawdown = equity.map((v, idx) => {
+          const peak = Math.max(...equity.slice(0, idx + 1));
+          return Number(((v - peak) / peak) * 100).toFixed(2);
+        });
+
+        if (equityChart) {
+          equityChart.data.labels = labels;
+          equityChart.data.datasets[0].data = equity;
+          equityChart.data.datasets[1].data = drawdown;
+          equityChart.update();
+          return;
+        }
+
+        equityChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              {
+                label: 'Equity',
+                data: equity,
+                borderColor: '#2BD4BD',
+                backgroundColor: 'rgba(43, 212, 189, 0.15)',
+                tension: 0.35,
+                fill: true,
+                borderWidth: 2,
+              },
+              {
+                label: 'Drawdown %',
+                data: drawdown,
+                borderColor: '#38BDF8',
+                borderDash: [6, 6],
+                tension: 0.35,
+                fill: false,
+              },
+            ],
+          },
+          options: {
+            plugins: { legend: { display: false } },
+            scales: {
+              y: { ticks: { color: '#94A3B8' }, grid: { color: 'rgba(148, 163, 184, 0.15)' } },
+              x: { ticks: { color: '#94A3B8' }, grid: { display: false } },
+            },
+          },
+        });
+      };
+
+      const renderPositions = (rows = []) => {
+        const tbody = document.getElementById('positionsBody');
+        if (!tbody) return;
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-slate-500">Không có vị thế mở.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = rows
+          .map((row) => {
+            const pnlClass = Number(row.pnl || 0) >= 0 ? 'text-success' : 'text-danger';
+            return `
+              <tr class="hover:bg-slate-900/40 transition">
+                <td class="py-3 font-semibold">${row.symbol}</td>
+                <td class="py-3">${row.campaign}</td>
+                <td class="py-3">${row.side}</td>
+                <td class="py-3">${fmtNumber(row.qty)}</td>
+                <td class="py-3">${fmtCurrency(row.avg_price)}</td>
+                <td class="py-3 text-slate-400">${row.sl ? fmtCurrency(row.sl) : '--'} / ${row.tp ? fmtCurrency(row.tp) : '--'}</td>
+                <td class="py-3 ${pnlClass}">${fmtCurrency(row.pnl)}</td>
+                <td class="py-3 text-slate-400">${fmtTime(row.updated_at)}</td>
+              </tr>`;
+          })
+          .join('');
+      };
+
+      const renderOrders = (rows = []) => {
+        const tbody = document.getElementById('ordersBody');
+        if (!tbody) return;
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-slate-500">Chưa có lệnh gần đây.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = rows
+          .map((row) => {
+            const fee = row.fee_amount ? `${fmtNumber(row.fee_amount)} ${row.fee_asset || ''}` : '--';
+            const slippage = row.slippage_bps ? `${fmtNumber(row.slippage_bps, 2)} bps` : '--';
+            return `
+              <tr class="hover:bg-slate-900/40 transition">
+                <td class="py-3">${fmtTime(row.created_at)}</td>
+                <td class="py-3 font-semibold">${row.symbol}</td>
+                <td class="py-3">${row.side}</td>
+                <td class="py-3">${row.type}</td>
+                <td class="py-3">${fmtNumber(row.qty)}</td>
+                <td class="py-3">${row.price ? fmtCurrency(row.price) : '--'}</td>
+                <td class="py-3 text-slate-400">${fee}</td>
+                <td class="py-3 text-slate-400">${slippage}</td>
+              </tr>`;
+          })
+          .join('');
+      };
+
+      const renderScreener = (grouped = {}) => {
+        const tbody = document.getElementById('screenerBody');
+        if (!tbody) return;
+        const rows = [];
+        Object.entries(grouped).forEach(([campaign, entries]) => {
+          entries.forEach((entry) => {
+            rows.push({ campaign, ...entry });
+          });
+        });
+        if (!rows.length) {
+          tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-slate-500">Chưa có tín hiệu screener.</td></tr>`;
+          return;
+        }
+        tbody.innerHTML = rows
+          .map((row) => {
+            const actionColor = row.action === 'BUY' ? 'text-success' : row.action === 'SELL' ? 'text-danger' : 'text-slate-300';
+            return `
+              <tr class="hover:bg-slate-900/40 transition">
+                <td class="py-3 font-semibold">${row.symbol}</td>
+                <td class="py-3">${row.campaign}</td>
+                <td class="py-3">${fmtNumber(row.score)}</td>
+                <td class="py-3">${fmtPercent(row.atr_pct)}</td>
+                <td class="py-3">${fmtPercent(row.expected_return)}</td>
+                <td class="py-3 font-semibold ${actionColor}">${row.action}</td>
+              </tr>`;
+          })
+          .join('');
+      };
+
+      const renderSignals = (grouped = {}) => {
+        const list = document.getElementById('signalsList');
+        if (!list) return;
+        const entries = [];
+        Object.entries(grouped).forEach(([campaign, signals]) => {
+          signals.forEach((signal) => entries.push({ campaign, ...signal }));
+        });
+        entries.sort((a, b) => new Date(b.created_at || b.timestamp || 0) - new Date(a.created_at || a.timestamp || 0));
+        if (!entries.length) {
+          list.innerHTML = '<li class="text-slate-500">Chưa có tín hiệu RL.</li>';
+          return;
+        }
+        list.innerHTML = entries
+          .map((item) => {
+            const color = item.action === 'BUY' ? 'bg-success/20 text-success' : item.action === 'SELL' ? 'bg-danger/20 text-danger' : 'bg-slate-700 text-slate-200';
+            return `
+              <li class="flex items-center justify-between glass rounded-2xl px-4 py-3">
+                <div>
+                  <div class="flex items-center space-x-2">
+                    <span class="uppercase text-xs font-semibold ${color} px-2 py-1 rounded-full">${item.action}</span>
+                    <span class="font-semibold">${item.symbol}</span>
+                    <span class="text-xs text-slate-400">${item.campaign}</span>
+                  </div>
+                  <div class="text-xs text-slate-400 mt-1">Confidence: ${(item.score || item.confidence ? Number(item.score || item.confidence).toFixed(2) + '%' : '--')} · ATR% ${fmtPercent(item.atr_pct)}</div>
+                </div>
+                <span class="text-xs text-slate-500">${fmtTime(item.created_at)}</span>
+              </li>`;
+          })
+          .join('');
+      };
+
+      const renderAlerts = (rows = []) => {
+        const list = document.getElementById('systemAlerts');
+        if (!list) return;
+        if (!rows.length) {
+          list.innerHTML = '<li class="text-slate-500">Không có cảnh báo quan trọng.</li>';
+          return;
+        }
+        list.innerHTML = rows
+          .map((row) => {
+            const color = row.severity === 'CRITICAL' ? 'text-danger' : row.severity === 'WARN' ? 'text-warning' : 'text-slate-200';
+            return `
+              <li class="glass rounded-2xl px-4 py-3">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold ${color}">${row.severity}</span>
+                  <span class="text-xs text-slate-500">${fmtTime(row.created_at)}</span>
+                </div>
+                <p class="text-sm text-slate-200 mt-1">${row.message}</p>
+              </li>`;
+          })
+          .join('');
+      };
+
+      const renderRisk = (settings = {}) => {
+        const mapping = {
+          position_pct_max: 'riskPosition',
+          daily_stop_pct: 'riskDailySpot',
+          daily_stop_fut_pct: 'riskDailyFut',
+          atr_sl_mult: 'riskAtrSl',
+          atr_tp_mult: 'riskAtrTp',
+          fee_taker_spot: 'riskFee',
+        };
+        Object.entries(mapping).forEach(([key, elementId]) => {
+          const el = document.getElementById(elementId);
+          if (!el) return;
+          if (key === 'fee_taker_spot') {
+            el.textContent = `${fmtPercent(settings.fee_taker_spot ? settings.fee_taker_spot * 100 : 0, 2)} spot / ${fmtPercent(settings.fee_taker_fut ? settings.fee_taker_fut * 100 : 0, 2)} fut`;
+          } else {
+            const value = settings[key] ?? settings[key.replace('daily_stop', 'daily_stop_spot')];
+            el.textContent = typeof value === 'number' ? (key.includes('pct') ? fmtPercent(value) : value.toString()) : '--';
+          }
+        });
+      };
+
+      const updateStatus = async () => {
+        try {
+          const response = await fetch('/api/v1/status');
+          const data = await response.json();
+          document.getElementById('navTotal').textContent = fmtCurrency(data.account?.total);
+          document.getElementById('navSpot').textContent = fmtCurrency(data.account?.spot);
+          document.getElementById('navFutures').textContent = fmtCurrency(data.account?.fut);
+          document.getElementById('sessionPnl').textContent = fmtCurrency(data.session_pnl);
+          document.getElementById('sessionPnlPct').textContent = fmtPercent(data.session_pnl_pct ?? 0);
+          document.getElementById('statusTimestamp').textContent = fmtTime(data.timestamp);
+          document.getElementById('openPositions').textContent = data.open_positions ?? 0;
+          document.getElementById('criticalAlerts').textContent = data.critical_alerts ?? 0;
+          document.getElementById('heartbeat').textContent = data.heartbeat ? fmtTime(data.heartbeat) : '--';
+          document.getElementById('dbLatency').textContent = data.db_latency ? `${fmtNumber(data.db_latency)} ms` : '-- ms';
+          document.getElementById('uptime').textContent = data.kpis?.uptime ? fmtPercent(data.kpis.uptime) : '99.5%';
+          if (data.nav_change_pct !== undefined) {
+            const el = document.getElementById('navChange');
+            el.textContent = fmtPercent(data.nav_change_pct);
+            el.classList.toggle('text-danger', data.nav_change_pct < 0);
+            el.classList.toggle('text-success', data.nav_change_pct >= 0);
+          }
+          ensureChart(data.equity_curve || []);
+          renderRisk({
+            position_pct_max: data.settings?.position_pct_max ? Number(data.settings.position_pct_max) : undefined,
+            daily_stop_pct: data.settings?.daily_stop_pct ? Number(data.settings.daily_stop_pct) : undefined,
+            daily_stop_fut_pct: data.settings?.daily_stop_fut_pct ? Number(data.settings.daily_stop_fut_pct) : undefined,
+            atr_sl_mult: data.settings?.atr_sl_mult ? Number(data.settings.atr_sl_mult) : undefined,
+            atr_tp_mult: data.settings?.atr_tp_mult ? Number(data.settings.atr_tp_mult) : undefined,
+            fee_taker_spot: data.settings?.fee_taker_spot ? Number(data.settings.fee_taker_spot) : undefined,
+            fee_taker_fut: data.settings?.fee_taker_fut ? Number(data.settings.fee_taker_fut) : undefined,
+          });
+          const kpis = data.kpis || {};
+          document.getElementById('kpiSharpe').textContent = fmtNumber(kpis.sharpe ?? 0, 2);
+          document.getElementById('kpiSortino').textContent = fmtNumber(kpis.sortino ?? 0, 2);
+          document.getElementById('kpiMaxDD').textContent = `${fmtNumber(kpis.max_drawdown ?? 0, 2)}%`;
+          document.getElementById('kpiProfitFactor').textContent = fmtNumber(kpis.profit_factor ?? 0, 2);
+          document.getElementById('kpiHitRate').textContent = `${fmtNumber((kpis.hit_rate ?? 0) * 100, 2)}%`;
+          if (kpis.uptime !== undefined) {
+            document.getElementById('kpiUptime').textContent = `${fmtNumber((kpis.uptime ?? 0) * 100, 2)}%`;
+          }
+          renderAlerts(data.alerts || []);
+        } catch (error) {
+          console.error('Failed to fetch status', error);
+        }
+      };
+
+      const updatePositions = async () => {
+        try {
+          const response = await fetch('/api/v1/positions');
+          const data = await response.json();
+          renderPositions(data);
+        } catch (error) {
+          console.error('Failed to fetch positions', error);
+        }
+      };
+
+      const updateOrders = async () => {
+        try {
+          const response = await fetch('/api/v1/orders/recent');
+          const data = await response.json();
+          renderOrders(data);
+        } catch (error) {
+          console.error('Failed to fetch orders', error);
+        }
+      };
+
+      const updateScreener = async () => {
+        try {
+          const response = await fetch('/api/v1/screener/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+          const data = await response.json();
+          renderScreener(data);
+        } catch (error) {
+          console.error('Failed to fetch screener', error);
+        }
+      };
+
+      const updateSignals = async () => {
+        try {
+          const response = await fetch('/api/v1/signals/recent');
+          const data = await response.json();
+          renderSignals(data);
+          document.getElementById('signalsUpdated').textContent = fmtTime(new Date().toISOString());
+        } catch (error) {
+          console.error('Failed to fetch signals', error);
+        }
+      };
+
+      const refreshAll = () => {
+        updateStatus();
+        updatePositions();
+        updateOrders();
+        updateScreener();
+        updateSignals();
+        fetch('/api/v1/alerts')
+          .then((resp) => resp.json())
+          .then((data) => renderAlerts(data))
+          .catch((error) => console.error('Failed to fetch alerts', error));
+      };
+
+      document.querySelectorAll('.tab-button').forEach((button) => {
+        button.addEventListener('click', () => {
+          document.querySelectorAll('.tab-button').forEach((btn) => btn.classList.remove('active'));
+          document.querySelectorAll('main section').forEach((section) => section.classList.add('hidden'));
+          button.classList.add('active');
+          const target = document.getElementById(button.dataset.target);
+          if (target) {
+            target.classList.remove('hidden');
+          }
+        });
+      });
+
+      document.querySelectorAll('.sub-tab-button').forEach((button) => {
+        button.addEventListener('click', () => {
+          document.querySelectorAll('.sub-tab-button').forEach((btn) => btn.classList.remove('active'));
+          document.getElementById('openPositionsTable').classList.add('hidden');
+          document.getElementById('recentOrdersTable').classList.add('hidden');
+          button.classList.add('active');
+          const target = document.getElementById(button.dataset.subtarget);
+          if (target) target.classList.remove('hidden');
+        });
+      });
+
+      document.getElementById('runScreener').addEventListener('click', () => updateScreener());
+
+      document.getElementById('manualOrderForm').addEventListener('submit', (event) => {
+        event.preventDefault();
+        const form = new FormData(event.target);
+        const payload = Object.fromEntries(form.entries());
+        console.log('Manual order payload', payload);
+        const retrainStatus = document.getElementById('retrainStatus');
+        retrainStatus.textContent = `Đã gửi order giả lập ${payload.side} ${payload.symbol} (${payload.qty}).`;
+        retrainStatus.classList.add('text-accent');
+        setTimeout(() => retrainStatus.classList.remove('text-accent'), 2000);
+      });
+
+      document.querySelectorAll('[data-action]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const action = button.dataset.action;
+          const retrainStatus = document.getElementById('retrainStatus');
+          retrainStatus.textContent = `Thao tác ${action.toUpperCase()} đã được gửi.`;
+          retrainStatus.classList.add('text-slate-200');
+          setTimeout(() => retrainStatus.classList.remove('text-slate-200'), 3000);
+        });
+      });
+
+      document.getElementById('themeToggle').addEventListener('click', () => {
+        const html = document.documentElement;
+        const isDark = html.classList.toggle('light-theme');
+        if (isDark) {
+          document.getElementById('themeToggle').textContent = 'Chế độ sáng';
+          html.style.background = '#F1F5F9';
+          document.body.classList.remove('text-slate-100');
+          document.body.classList.add('text-slate-900');
+        } else {
+          document.getElementById('themeToggle').textContent = 'Chế độ tối';
+          html.style.background = 'transparent';
+          document.body.classList.add('text-slate-100');
+          document.body.classList.remove('text-slate-900');
+        }
+      });
+
+      refreshAll();
+      setInterval(refreshAll, 30000);
+    </script>
+  </body>
+</html>
