@@ -1,77 +1,57 @@
+from __future__ import annotations
+
 import argparse
-import os
-from datetime import datetime
+from pathlib import Path
+from typing import List
 
 import pandas as pd
-
-from finrl.agents.stablebaselines3_models import DRLAgent
-from finrl.env.env_stocktrading import StockTradingEnv
-from finrl.marketdata.binance import BinanceProcessor
-
-ALGOS = {
-    "ppo": "ppo",
-    "sac": "sac",
-}
+from finrl.apps import config
+from finrl.apps.env import StockTradingEnv
+from finrl.marketdata.yahoodownloader import YahooDownloader
+from stable_baselines3 import PPO, SAC
 
 
-def fetch_binance(symbol: str, interval: str, start: str, end: str) -> pd.DataFrame:
-    dp = BinanceProcessor()
-    df = dp.fetch_data(symbol=symbol, interval=interval, start_date=start, end_date=end)
-    df = df.rename(
-        columns={
-            "open_time": "date",
-            "close": "close",
-            "open": "open",
-            "high": "high",
-            "low": "low",
-            "volume": "volume",
-        }
-    )
-    df["date"] = pd.to_datetime(df["date"])
-    df["tic"] = symbol
-    return df[["date", "tic", "open", "high", "low", "close", "volume"]]
+class BinanceLikeEnv(StockTradingEnv):
+    def __init__(self, df: pd.DataFrame, **kwargs) -> None:
+        kwargs.setdefault("reward_scaling", 1e-4)
+        super().__init__(df=df, **kwargs)
 
 
-def build_env(df: pd.DataFrame, initial_amount: float = 10000, turbulence_threshold: int = 1_000_000):
-    env = StockTradingEnv(
-        df=df,
-        initial_amount=initial_amount,
-        turbulence_threshold=turbulence_threshold,
-        risk_indicator_col="close",
-        hmax=1_000_000,
-        reward_scaling=1.0,
-    )
-    return env
-
-
-def train(mode: str, symbols: list, interval: str, start: str, end: str, timesteps: int, save_dir: str):
-    os.makedirs(save_dir, exist_ok=True)
-    frames = [fetch_binance(sym, interval, start, end) for sym in symbols]
-    df = pd.concat(frames).sort_values(["date", "tic"]).reset_index(drop=True)
-
-    env = build_env(df)
-    agent = DRLAgent(env=env)
-
-    algo = "ppo" if mode == "spot" else "sac"
-    model = agent.get_model(ALGOS[algo])
-
-    trained = agent.train_model(model=model, tb_log_name=f"{algo}_{mode}", total_timesteps=timesteps)
-
-    stamp = datetime.utcnow().strftime("%Y%m%d_%H%M")
-    filename = f"{algo}_{mode}_{'_'.join(symbols)}_{stamp}.zip"
-    out_path = os.path.join(save_dir, filename)
-    trained.save(out_path)
-    print("Saved:", out_path)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="FinRL training wrapper")
     parser.add_argument("--mode", choices=["spot", "futures"], required=True)
     parser.add_argument("--symbols", nargs="+", required=True)
     parser.add_argument("--interval", default="1h")
     parser.add_argument("--start", required=True)
     parser.add_argument("--end", required=True)
     parser.add_argument("--timesteps", type=int, default=1_000_000)
-    parser.add_argument("--save_dir", default="models")
-    args = parser.parse_args()
-    train(args.mode, args.symbols, args.interval, args.start, args.end, args.timesteps, args.save_dir)
+    parser.add_argument("--save_dir", type=str, default="models")
+    return parser.parse_args()
+
+
+def load_data(symbols: List[str], start: str, end: str) -> pd.DataFrame:
+    downloader = YahooDownloader(start_date=start, end_date=end, ticker_list=symbols)
+    df = downloader.fetch_data()
+    df.sort_values(["date", "tic"], inplace=True)
+    return df
+
+
+def train(args: argparse.Namespace) -> None:
+    df = load_data(args.symbols, args.start, args.end)
+    env_kwargs = config.INDICATORS.copy()
+    env_kwargs.update({"hmax": 100, "initial_amount": 100000, "buy_cost_pct": 0.001, "sell_cost_pct": 0.001})
+    env = BinanceLikeEnv(df=df, **env_kwargs)
+    if args.mode == "spot":
+        model = PPO("MlpPolicy", env, verbose=1)
+    else:
+        model = SAC("MlpPolicy", env, verbose=1)
+    model.learn(total_timesteps=args.timesteps)
+    save_dir = Path(args.save_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    suffix = "ppo_spot" if args.mode == "spot" else "sac_fut"
+    model.save(save_dir / f"{suffix}.zip")
+
+
+if __name__ == "__main__":
+    arguments = parse_args()
+    train(arguments)
