@@ -14,8 +14,8 @@
 | `app/execution/executor.py` | Kiểm tra phí/slippage & đặt lệnh OCO |
 | `app/bot/daemon.py` | Daemon giám sát 24/24, trailing SL, heartbeat |
 | `app/bot/scheduler.py` | Chu trình mỗi giờ: collect → screener → RL → orders |
-| `app/api/server.py` | FastAPI `/api/v1` (health, risk, pause, signals, metrics) |
-| `frontend/pages/index.tsx` | Dashboard Python-rendered (HTMX + TailwindCSS) hiển thị NAV, positions, signals |
+| `app/api/server.py` | FastAPI `/api/v1` (health, risk, pause, signals, metrics) & trang dashboard |
+| `app/templates/dashboard.html` | Dashboard Python (Jinja2 + HTMX + TailwindCSS) hiển thị NAV, positions, signals |
 
 ## Cài đặt
 
@@ -62,7 +62,7 @@ Các service:
 * `db`: PostgreSQL lưu NAV, positions, signals, alerts.
 * `redis`: Cache dữ liệu & cờ điều khiển.
 
-Dashboard truy cập tại `http://localhost:8000` (proxy qua Next.js khi triển khai) hoặc sử dụng API trực tiếp.
+Dashboard truy cập tại `http://localhost:8000` trực tiếp từ FastAPI (Jinja2 + HTMX) hoặc sử dụng API JSON.
 
 ## Lưu ý vận hành
 
