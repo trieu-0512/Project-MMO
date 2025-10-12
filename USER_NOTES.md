@@ -75,7 +75,7 @@
     }
   },
   "frontend_stack": {
-    "framework": "Next.js (React 18) + TailwindCSS + Recharts + Zustand",
+    "framework": "Python (FastAPI + Jinja2 + HTMX + TailwindCSS)",
     "components": {
       "Header": "Logo, tài khoản, nút bật/tắt bot",
       "Tabs": "Dashboard / Trading / System",

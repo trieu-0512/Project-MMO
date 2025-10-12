@@ -1,6 +1,6 @@
 # Auto Crypto Trading Bot (FinRL + Binance)
 
-Ứng dụng giao dịch tự động đa chiến dịch (Spot/Futures) sử dụng FinRL + Stable-Baselines3 cho inference, FastAPI cho API điều khiển và Next.js dashboard quản trị.
+Ứng dụng giao dịch tự động đa chiến dịch (Spot/Futures) sử dụng FinRL + Stable-Baselines3 cho inference, FastAPI cho API điều khiển và dashboard Python (FastAPI + Jinja2 + HTMX + TailwindCSS).
 
 ## Thành phần chính
 
@@ -15,7 +15,7 @@
 | `app/bot/daemon.py` | Daemon giám sát 24/24, trailing SL, heartbeat |
 | `app/bot/scheduler.py` | Chu trình mỗi giờ: collect → screener → RL → orders |
 | `app/api/server.py` | FastAPI `/api/v1` (health, risk, pause, signals, metrics) |
-| `frontend/pages/index.tsx` | Dashboard Tailwind hiển thị NAV, positions, signals |
+| `frontend/pages/index.tsx` | Dashboard Python-rendered (HTMX + TailwindCSS) hiển thị NAV, positions, signals |
 
 ## Cài đặt
 
